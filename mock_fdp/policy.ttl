@@ -1,0 +1,67 @@
+@prefix odrl: <http://www.w3.org/ns/odrl/2/> .
+@prefix ex: <http://example.org/> .
+
+# FDP-wide: Research-only
+<#orgResearchOnly> a odrl:Policy ;
+    odrl:permission [
+        odrl:assignee ex:Alice ;
+        odrl:action odrl:read ;
+        odrl:target <http://localhost:8000/dataset1.ttl> ;
+        odrl:constraint [
+            odrl:leftOperand odrl:purpose ;
+            odrl:operator odrl:eq ;
+            odrl:rightOperand ex:research
+        ]
+    ] .
+
+# Catalog1: Only Bob
+<#catalog1BobOnly> a odrl:Policy ;
+    odrl:permission [
+        odrl:assignee ex:Bob ;
+        odrl:action odrl:read ;
+        odrl:target <http://localhost:8000/dataset1.ttl>
+    ] .
+
+# Dataset2: Only Alice
+<#dataset2AliceOnly> a odrl:Policy ;
+    odrl:permission [
+        odrl:assignee ex:Alice ;
+        odrl:action odrl:read ;
+        odrl:target <http://localhost:8000/dataset1.ttl>
+    ] .
+
+# Distribution1: Allow Alice
+<#distribution1Alice> a odrl:Policy ;
+    odrl:permission [
+        odrl:assignee ex:Alice ;
+        odrl:action odrl:read ;
+        odrl:target <http://localhost:8000/dataset1.ttl>
+    ] .
+
+# Distribution2: Prohibit Bob
+<#distribution2ProhibitBob> a odrl:Policy ;
+    odrl:prohibition [
+        odrl:assignee ex:Bob ;
+        odrl:action odrl:read ;
+        odrl:target <http://localhost:8000/dataset1.ttl>
+    ] .
+
+# Distribution 3: Allow Bob
+<#distribution3Bob> a odrl:Policy ;
+    odrl:permission [
+        odrl:assignee ex:Bob ;
+        odrl:action odrl:read ;
+        odrl:target <http://localhost:8000/dataset2.ttl>
+    ] .
+
+# Distribution 4: Open to both
+<#distribution4Open> a odrl:Policy ;
+    odrl:permission [
+        odrl:assignee ex:Alice ;
+        odrl:action odrl:read ;
+        odrl:target <http://localhost:8000/dataset3.ttl>
+    ], [
+        odrl:assignee ex:Bob ;
+        odrl:action odrl:read ;
+        odrl:target <http://localhost:8000/dataset3.ttl>
+    ] .

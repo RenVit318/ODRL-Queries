@@ -1,0 +1,65 @@
+@prefix odrl: <http://www.w3.org/ns/odrl/2/> .
+@prefix ex: <http://example.org/> .
+
+# Broad policy (everyone can read everything for research)
+# Applies at FDP level
+<#orgPolicy> a odrl:Policy ;
+    odrl:permission [
+        odrl:assignee ex:Alice ;
+        odrl:action odrl:read ;
+        odrl:target <http://localhost:8000/dataset.ttl> ;
+        odrl:constraint [
+            odrl:leftOperand odrl:purpose ;
+            odrl:operator odrl:eq ;
+            odrl:rightOperand ex:research
+        ]
+    ] .
+
+# Catalog-level refinement (only Alice is allowed)
+<#catalogPolicy> a odrl:Policy ;
+    odrl:permission [
+        odrl:assignee ex:Alice ;
+        odrl:action odrl:read ;
+        odrl:target <http://localhost:8000/dataset.ttl>
+    ] .
+
+# Dataset-specific policy (still permits Alice)
+<#datasetPolicy> a odrl:Policy ;
+    odrl:permission [
+        odrl:assignee ex:Alice ;
+        odrl:action odrl:read ;
+        odrl:target <http://localhost:8000/dataset.ttl>
+    ] .
+
+# Distribution-level restrictive override
+<#distributionPolicy> a odrl:Policy ;
+    odrl:permission [
+        odrl:assignee ex:Alice ;
+        odrl:action odrl:read ;
+        odrl:target <http://localhost:8000/dataset.ttl> ;
+        odrl:constraint [
+            odrl:leftOperand odrl:purpose ;
+            odrl:operator odrl:eq ;
+            odrl:rightOperand ex:clinicalTrial
+        ]
+    ] .
+
+# Distribution 3: Allow Bob
+<#distribution3Bob> a odrl:Policy ;
+    odrl:permission [
+        odrl:assignee ex:Bob ;
+        odrl:action odrl:read ;
+        odrl:target <http://localhost:8000/dataset2.ttl>
+    ] .
+
+# Distribution 4: Open to both
+<#distribution4Open> a odrl:Policy ;
+    odrl:permission [
+        odrl:assignee ex:Alice ;
+        odrl:action odrl:read ;
+        odrl:target <http://localhost:8000/dataset3.ttl>
+    ], [
+        odrl:assignee ex:Bob ;
+        odrl:action odrl:read ;
+        odrl:target <http://localhost:8000/dataset3.ttl>
+    ] .

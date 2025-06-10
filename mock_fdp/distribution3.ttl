@@ -1,0 +1,6 @@
+@prefix dcat: <http://www.w3.org/ns/dcat#> .
+@prefix odrl: <http://www.w3.org/ns/odrl/2/> .
+
+<http://localhost:8000/distribution3.ttl>
+    dcat:accessURL <http://dbpedia.org/sparql-3> ;
+    odrl:hasPolicy <http://localhost:8000/policy.ttl#distribution3Bob> .

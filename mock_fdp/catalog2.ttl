@@ -1,0 +1,4 @@
+@prefix ldp: <http://www.w3.org/ns/ldp#> .
+
+<http://localhost:8000/catalog2.ttl>
+    ldp:contains <http://localhost:8000/dataset3.ttl> .

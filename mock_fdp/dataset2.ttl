@@ -1,0 +1,6 @@
+@prefix ldp: <http://www.w3.org/ns/ldp#> .
+@prefix odrl: <http://www.w3.org/ns/odrl/2/> .
+
+<http://localhost:8000/dataset2.ttl>
+    ldp:contains <http://localhost:8000/distribution3.ttl> ;
+    odrl:hasPolicy <http://localhost:8000/policy.ttl#dataset2AliceOnly> .

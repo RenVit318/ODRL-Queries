@@ -1,0 +1,5 @@
+@prefix ldp: <http://www.w3.org/ns/ldp#> .
+
+<http://localhost:8000/dataset1.ttl>
+    ldp:contains <http://localhost:8000/distribution1.ttl> ,
+                 <http://localhost:8000/distribution2.ttl> .
