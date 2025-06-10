@@ -88,7 +88,7 @@ def check_policy(policy_refs, user_graph, query_graph, mode):
         return False
 
     i = 0
-    for user in user_graph.subjects(RDF.type, FOAF.Person, unique=True):
+    for user in user_graph.subjects(RDF.type, FOAF.Person, unique=True): # Assumes this declaration!
         i += 1
     if i > 1:
         print(f"WARNING: CURRENTLY ONLY SUPPORTING ONE USER PER FILE. USING PROFILE {user}")
@@ -104,15 +104,15 @@ def check_policy(policy_refs, user_graph, query_graph, mode):
             print(f"WARNING: Could not find policy {policy} in policy graph. Skipping this.")
             continue
         for rule in policy_graph.objects(policy, getattr(ODRL, mode)): # mode = 'permission' or 'prohibition'
-            assignee = policy_graph.value(rule, ODRL.assignee)
-            action = policy_graph.value(rule, ODRL.action)
-            target = policy_graph.value(rule, ODRL.target)
+            assignee = policy_graph.objects(rule, ODRL.assignee)
+            action = policy_graph.objects(rule, ODRL.action)
+            target = policy_graph.objects(rule, ODRL.target)
 
             # Check if targeting matches. Each of these is still very simplistic
-            user_match = assignee == user # Assumes this declaration!
-            action_match = action == query_action
-            target_match = target == query_graph.value(query_sbj, ODRL.target) # This cannot work in the full FDP version!! 
-
+            user_match = user in assignee 
+            action_match = query_action in action
+            target_match = query_graph.value(query_sbj, ODRL.target) in target # This cannot work in the full FDP version!! 
+            print(user_match, action_match, target_match)
             if user_match and action_match and target_match:
                 if matches_constraints(policy_graph, rule, query_graph, query_sbj, user_graph, user):
                     allowed = True
@@ -120,69 +120,3 @@ def check_policy(policy_refs, user_graph, query_graph, mode):
                     print(f"access denied by policy {policy}")
     return allowed
 
-
-def is_query_allowed(user, query, dataset_uri, purpose, policy_refs, check_prohibition_only=False):
-    g = Graph()
-    loaded_uris = set()
-
-    for ref, source_graph in policy_refs:
-        if isinstance(ref, URIRef):
-            base_uri, _ = urldefrag(ref)
-            if base_uri not in loaded_uris:
-                try:
-                    g.parse(base_uri, format="turtle")
-                    loaded_uris.add(base_uri)
-                except Exception as e:
-                    print(f"Warning: Failed to load policy from {base_uri}: {e}")
-        elif isinstance(ref, BNode):
-            for triple in source_graph.triples((ref, None, None)):
-                g.add(triple)
-
-    query_action = deduce_action_from_query(query)
-    if query_action is None:
-        print("Could not deduce action from query.")
-        return False
-
-    if check_prohibition_only:
-        for ref, _ in policy_refs:
-            policy = ref
-            if (policy, rdflib.RDF.type, ODRL.Policy) not in g:
-                continue
-            for prohibition in g.objects(policy, ODRL.prohibition):
-                assignee = g.value(prohibition, ODRL.assignee)
-                action = g.value(prohibition, ODRL.action)
-                target = g.value(prohibition, ODRL.target)
-
-                if str(assignee) == user and str(target) == dataset_uri and action == query_action:
-                    matches = True
-                    for constraint in g.objects(prohibition, ODRL.constraint):
-                        left = g.value(constraint, ODRL.leftOperand)
-                        op = g.value(constraint, ODRL.operator)
-                        right = g.value(constraint, ODRL.rightOperand)
-                        if left == ODRL.purpose and op == ODRL.eq and str(right) != purpose:
-                            matches = False
-                    if matches:
-                        return True
-        return False
-
-    for ref, _ in policy_refs:
-        policy = ref
-        if (policy, rdflib.RDF.type, ODRL.Policy) not in g:
-            continue
-        for permission in g.objects(policy, ODRL.permission):
-            assignee = g.value(permission, ODRL.assignee)
-            action = g.value(permission, ODRL.action)
-            target = g.value(permission, ODRL.target)
-
-            if str(assignee) == user and str(target) == dataset_uri and action == query_action:
-                matched = True
-                for constraint in g.objects(permission, ODRL.constraint):
-                    left = g.value(constraint, ODRL.leftOperand)
-                    op = g.value(constraint, ODRL.operator)
-                    right = g.value(constraint, ODRL.rightOperand)
-                    if left == ODRL.purpose and op == ODRL.eq and str(right) != purpose:
-                        matched = False
-                if matched:
-                    return True
-
-    return False
