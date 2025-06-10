@@ -1,6 +1,6 @@
 from SPARQLWrapper import SPARQLWrapper, JSON
 
-def run_query(query, dataset_uri):
+def run_query(endpoint_url, query_graph):
     print("EXECUTING QUERY CODE TO BE IMPLEMENTED")
 
 def run_query_TODO(query, dataset_uri):

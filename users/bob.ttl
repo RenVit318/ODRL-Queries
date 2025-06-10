@@ -1,0 +1,6 @@
+@prefix ex: <http://example.org/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+
+ex:Bob a foaf:Person ;
+    ex:hasRole ex:Researcher ;
+    ex:affiliation ex:UniversityX .
