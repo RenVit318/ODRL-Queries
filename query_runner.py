@@ -9,7 +9,7 @@ def run_query_TODO(query, dataset_uri):
     sparql.setReturnFormat(JSON)
 
     #Hardcoded credentials - do this through a secret config file or through an input box on the website
-    sparql.setCredentials('admin', 'vodan')
+    sparql.setCredentials('user', 'pass')
 
     results = sparql.query().convert()
     print(results)

@@ -1,12 +1,13 @@
 import requests
 import rdflib
 from rdflib import Graph
-from rdflib.namespace import DCAT, XSD, Namespace
-from policy_checker import check_policy
+from rdflib.namespace import DCAT, XSD, Namespace, RDF, FOAF
+from policy_checker import check_policy, deduce_action_from_query
 from query_runner import run_query
 
 LDP = Namespace("http://www.w3.org/ns/ldp#")
 ODRL = Namespace("http://www.w3.org/ns/odrl/2/")
+EX = Namespace("http://example.org/")
 
 class PolicyAwareResource:
     def __init__(self, uri):
@@ -48,21 +49,20 @@ def extract_policies(graph, subject, include_fallback=False):
     in a resource file if it didn't find any based on the given URI. This is as a fallback in case the 
     self referencing URI doesn't match the given URI."""
     policies = []
-    policy_list = graph.objects(subject, ODRL.hasPolicy) 
-    print(graph.serialize())
-    print(len(list(policy_list)))
-    if len(list(policy_list)) == 0 and include_fallback:
-        policy_list = []
-        for _, ref in graph.subject_objects(ODRL.hasPolicy):
-            print('still nothing')
-            print(ref)
-            policy_list.append(ref)
 
-    for ref in policy_list:
+    for ref in graph.objects(subject, ODRL.hasPolicy) :
         if isinstance(ref, rdflib.BNode):
             policies.append((ref, graph))
         else:
             policies.append((ref, None))
+
+    if len(policies) == 0 and include_fallback:
+        for _, ref in graph.subject_objects(ODRL.hasPolicy):
+            if isinstance(ref, rdflib.BNode):
+                policies.append((ref, graph))
+            else:
+                policies.append((ref, None))
+        
     return policies
 
 def navigate_down_fdp(graph, uri, nav_predicate=LDP.contains):
@@ -70,15 +70,19 @@ def navigate_down_fdp(graph, uri, nav_predicate=LDP.contains):
     the given link and the link in RDF file are different (sometimes the case in the base URL)"""
 
     contains = graph.objects(rdflib.URIRef(uri), nav_predicate)
-    
-    if len(list(contains)) > 0:
-        return contains
+  
+    # Is there a better way to get the lengt of a generator without exracting the objects?
+    uris = []
+    for c in contains:
+        uris.append(c)
+    if len(uris) > 0:
+        return uris
 
+    print('falling back')
     # Fallback
-    contains = []
     for _, cat_uri in graph.subject_objects(nav_predicate):
-            contains.append(cat_uri)
-    return contains
+            uris.append(cat_uri)
+    return uris
 
 
 
@@ -89,6 +93,7 @@ def crawl_fdp(base_uri):
     fdp.policies.extend(extract_policies(g_base, rdflib.URIRef(base_uri), include_fallback=True))
 
     for cat_uri in navigate_down_fdp(g_base, base_uri):
+        print(cat_uri)
         catalog = Catalog(str(cat_uri))
         g_cat = parse_rdf_graph(str(cat_uri))
         catalog.policies.extend(extract_policies(g_cat, cat_uri, include_fallback=True))
@@ -105,6 +110,7 @@ def crawl_fdp(base_uri):
 
                 for sparql_endpoint in g_dist.objects(dist_uri, DCAT.accessURL): # Does not have the same fallback
                     distribution.sparql_endpoints.append(str(sparql_endpoint))
+                    print(sparql_endpoint)
 
                 dataset.distributions.append(distribution)
             catalog.datasets.append(dataset)
@@ -113,13 +119,44 @@ def crawl_fdp(base_uri):
 
 def check_if_supported(url):
     """Check what this endpoint is and if it is automatically queryable"""
-    return True
+    supported_keywords = ['allegrograph', 'sparql']
+    for kw in supported_keywords:
+        if kw in url:
+            return True
+    return False
+
+def prepare_query(user_graph_path, query_graph_path):
+    user_graph  = Graph().parse(user_graph_path,  format="turtle")
+    query_graph = Graph().parse(query_graph_path, format="turtle")
+
+    # Find all unique sbj that are ODRL Actions. Use this for extracting attributes
+    i = 0
+    for query_sbj in query_graph.subjects(RDF.type, ODRL.Action, unique=True):
+        i += 1
+    if i > 1:
+        print(f"WARNING: CURRENTLY ONLY SUPPORTING ONE QUERY. ONLY EXECUTING {query_sbj}")
+
+    query_action = deduce_action_from_query(query_graph.value(query_sbj, EX.queryText))
+    if query_action is None:
+        print("Could not deduce action from query.")
+        return False
+
+    i = 0
+    for user in user_graph.subjects(RDF.type, FOAF.Person, unique=True): # Assumes this declaration!
+        i += 1
+    if i > 1:
+        print(f"WARNING: CURRENTLY ONLY SUPPORTING ONE USER PER FILE. USING PROFILE {user}")
+
+    ########
+    
+    return query_graph, query_sbj, query_action, user_graph, user
 
 def query_orchestrator(fdp_uris, user_graph_path, query_graph_path):
     """Main function that crawls all provided FDPs, orchestrates policy checking and query execution"""
 
-    user_graph  = Graph().parse(user_graph_path,  format="turtle")
-    query_graph = Graph().parse(query_graph_path, format="turtle")
+    # Maybe also put this into one or more objects?
+    # Extract all required information for later matching etc. in the right variables
+    query_graph, query_sbj, query_action, user_graph, user = prepare_query(user_graph_path, query_graph_path)
 
     for fdp_uri in fdp_uris:
         print(f"\nProcessing FDP: {fdp_uri}")
@@ -138,6 +175,7 @@ def query_orchestrator(fdp_uris, user_graph_path, query_graph_path):
                         # Check what this endpoint is - only continue if it is a supported Triplestore
                         if not check_if_supported(endpoint_url):
                             print(f"ERROR: URL {endpoint_url} is not supported in the current version.")
+                            continue
 
                         #print(f"Checking access for endpoint: {endpoint_url}")
 
@@ -153,17 +191,21 @@ def query_orchestrator(fdp_uris, user_graph_path, query_graph_path):
 
                         for level_name, policy_refs in hierarchy:
 
-                            print(f"Evaluating prohibitions at level: {level_name}")
-                            print(policy_refs)
-                            if check_policy(policy_refs, user_graph, query_graph, mode="prohibition"):
+                            #print(f"Evaluating prohibitions at level: {level_name}")
+                            #print(policy_refs)
+                            #if len(policy_refs) > 0:
+                            #    print(policy_refs)
+                            if check_policy(policy_refs, query_graph, query_sbj, query_action, user_graph, user, endpoint_url, mode="prohibition"):
                                 print(f"Access to {endpoint_url} denied due to prohibition in policy. At level {level_name}")
                                 denied = True
                                 break
-                        print('keep it going')
+
                         if not denied:
                             for level_name, policy_refs in hierarchy:
-                                print(f"Evaluating permissions at level: {level_name}")
-                                if check_policy(policy_refs, user_graph, query_graph, mode="permission"):
+                                #print(f"Evaluating permissions at level: {level_name}")
+                                #if len(policy_refs) > 0:
+                                #    print(policy_refs)
+                                if check_policy(policy_refs, query_graph, query_sbj, query_action, user_graph, user, endpoint_url, mode="permission"):
                                     print(f"Access to {endpoint_url} granted by policy. At level {level_name}")
                                     allowed = True
                                     break
@@ -173,22 +215,3 @@ def query_orchestrator(fdp_uris, user_graph_path, query_graph_path):
 
                         else:
                             run_query(endpoint_url, query_graph)
-                        # Old policy handling logic
-                        #for level_name, policies in hierarchy:
-                        #    print(f"Evaluating permissions at level: {level_name}")
-                        #    if is_query_allowed(user, query, dataset.uri, purpose, policies):
-                        #        print("Access granted by policy")
-                        #        permission_found = True
-                        #    else:
-                        #        print("Access denied by policy")
-                        #    
-                        #for level_name, policies in hierarchy:
-                        #    print(f"Checking prohibitions at level: {level_name}")
-                        #    if is_query_allowed(user, query, dataset.uri, purpose, policies, check_prohibition_only=True):
-                        #        print("Access denied due to prohibition in policy.")
-                        #        break
-                        #    else:
-                        #        if permission_found:
-                        #            print("Access granted by policy.")
-                        #        else:
-                        #            print("Access denied: No applicable permission found.")

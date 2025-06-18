@@ -33,17 +33,18 @@ def deduce_action_from_query(query):
 
 
 def load_policy_graph(policy_refs):
+    """"""
     g = Graph()
     loaded_uris = set()
     for ref, source_graph in policy_refs:
         if isinstance(ref, URIRef):
             base_uri, _ = urldefrag(ref)
             if base_uri not in loaded_uris:
-                try:
+                #try:
                     g.parse(base_uri, format="turtle")
                     loaded_uris.add(base_uri)
-                except Exception as e:
-                    print(f"Warning: Failed to load policy from {base_uri}: {e}")
+                #except Exception as e:
+                #    print(f"Warning: Failed to load policy from {base_uri}: {e}")
         elif isinstance(ref, BNode):
             for triple in source_graph.triples((ref, None, None)):
                 g.add(triple)
@@ -51,52 +52,38 @@ def load_policy_graph(policy_refs):
 
 
 def matches_constraints(policy_graph, rule, query_graph, query_sbj, user_graph, user):
-    matched = False
+    """Find all constraints given in an ODRL policy and match them against the user and query graphs.
+    False means one or more of the constraints did not match. True means either all constraints matched or there were no constraints"""
+
+    i = 0 # Use this to count the number of constraints. Can't get the length of policy_graph.objects() 
     for constraint in policy_graph.objects(rule, ODRL.constraint):
+        i += 1
         # Assume the constraint is described as left = predicate, right = object
         left = policy_graph.value(constraint, ODRL.leftOperand)
         op = policy_graph.value(constraint, ODRL.operator)
         right = policy_graph.value(constraint, ODRL.rightOperand)
 
-        print(left, op, right)
+        #print(left, op, right)
         if op == ODRL.eq:
             # Search for the predicate in both the query graph and the user graph
             print(query_graph.value(query_sbj, left))
             if query_graph.value(query_sbj, left) == right:
-                matched = True
+                continue
             elif user_graph.value(user, left) == right:
-                matched = True 
+                continue
         else:
             print(f"WARNING: ODRL Operator {ODRL.eq} not yet supported.")
-    return matched
+
+        return False # No continue so no match in either graph
+    
+    return True # Either no constraints, or passed all constraints
 
 
-def check_policy(policy_refs, user_graph, query_graph, mode):
-
-    # Can do all of the below earlier, don't need to do this everytime
-
-    # Find all unique sbj that are ODRL Actions. Use this for extracting attributes
-    i = 0
-    for query_sbj in query_graph.subjects(RDF.type, ODRL.Action, unique=True):
-        i += 1
-    if i > 1:
-        print(f"WARNING: CURRENTLY ONLY SUPPORTING ONE QUERY. ONLY EXECUTING {query_sbj}")
-
-    query_action = deduce_action_from_query(query_graph.value(query_sbj, EX.queryText))
-    if query_action is None:
-        print("Could not deduce action from query.")
-        return False
-
-    i = 0
-    for user in user_graph.subjects(RDF.type, FOAF.Person, unique=True): # Assumes this declaration!
-        i += 1
-    if i > 1:
-        print(f"WARNING: CURRENTLY ONLY SUPPORTING ONE USER PER FILE. USING PROFILE {user}")
-    print(user)
-    ########
+def check_policy(policy_refs, query_graph, query_sbj, query_action, user_graph, user, endpoint_url, mode):
+    """"""
     
     policy_graph = load_policy_graph(policy_refs)
-    #print(policy_graph.serialize())
+
     allowed = False
     for ref, _ in policy_refs:
         policy = ref
@@ -111,12 +98,17 @@ def check_policy(policy_refs, user_graph, query_graph, mode):
             # Check if targeting matches. Each of these is still very simplistic
             user_match = user in assignee 
             action_match = query_action in action
-            target_match = query_graph.value(query_sbj, ODRL.target) in target # This cannot work in the full FDP version!! 
+            target_match = endpoint_url in target # Don't set one target but the target is always the discovered endpoint!
+            target_match = True#
             print(user_match, action_match, target_match)
+            #print('desired endpoint: ' + endpoint_url)
+
+
             if user_match and action_match and target_match:
                 if matches_constraints(policy_graph, rule, query_graph, query_sbj, user_graph, user):
                     allowed = True
                 else:
                     print(f"access denied by policy {policy}")
+
     return allowed
 
