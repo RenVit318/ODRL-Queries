@@ -2,8 +2,8 @@ import requests
 import rdflib
 from rdflib import Graph
 from rdflib.namespace import DCAT, XSD, Namespace, RDF, FOAF
-from policy_checker import check_policy, deduce_action_from_query
-from query_runner import run_query
+from .policy_checker import check_policy, deduce_action_from_query
+from .query_runner import run_query
 
 LDP = Namespace("http://www.w3.org/ns/ldp#")
 ODRL = Namespace("http://www.w3.org/ns/odrl/2/")
@@ -125,9 +125,15 @@ def check_if_supported(url):
             return True
     return False
 
-def prepare_query(user_graph_path, query_graph_path):
-    user_graph  = Graph().parse(user_graph_path,  format="turtle")
-    query_graph = Graph().parse(query_graph_path, format="turtle")
+def prepare_query(input_user_graph, input_query_graph, input_graph_type):
+    if input_graph_type == 'path':
+        user_graph  = Graph().parse(input_user_graph,  format="turtle")
+        query_graph = Graph().parse(input_query_graph, format="turtle")
+    elif input_graph_type == 'graph':
+        user_graph = input_user_graph
+        query_graph = input_query_graph
+    else:
+        raise TypeError(f"Unknown input type {input_graph_type}")
 
     # Find all unique sbj that are ODRL Actions. Use this for extracting attributes
     i = 0
@@ -151,12 +157,14 @@ def prepare_query(user_graph_path, query_graph_path):
     
     return query_graph, query_sbj, query_action, user_graph, user
 
-def query_orchestrator(fdp_uris, user_graph_path, query_graph_path):
+def query_orchestrator(fdp_uris, input_user_graph, input_query_graph, input_graph_type):
     """Main function that crawls all provided FDPs, orchestrates policy checking and query execution"""
 
     # Maybe also put this into one or more objects?
     # Extract all required information for later matching etc. in the right variables
-    query_graph, query_sbj, query_action, user_graph, user = prepare_query(user_graph_path, query_graph_path)
+
+    query_graph, query_sbj, query_action, user_graph, user = prepare_query(input_user_graph, input_query_graph, input_graph_type)
+    data = {}
 
     for fdp_uri in fdp_uris:
         print(f"\nProcessing FDP: {fdp_uri}")
@@ -214,4 +222,6 @@ def query_orchestrator(fdp_uris, user_graph_path, query_graph_path):
                             print(f"Access to {endpoint_url} denied: No applicable permission found.")  
 
                         else:
-                            run_query(endpoint_url, query_graph)
+                            data[endpoint_url] = run_query(query_graph, query_sbj, user_graph, user, endpoint_url)
+        
+    return data

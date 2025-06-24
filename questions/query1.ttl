@@ -4,7 +4,7 @@
 
 ex:Q1 a odrl:Action ;
   ex:queryText """
-    SELECT ?s WHERE { ?s a foaf:Person }
+    SELECT ?s ?p ?o WHERE { ?s ?p ?o } LIMIT 50
   """ ;
   odrl:purpose    ex:research ;
   ex:requestedAt "2025-06-10T14:00:00"^^xsd:dateTime .
