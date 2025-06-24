@@ -3,4 +3,6 @@
 
 ex:Alice a foaf:Person ;
     ex:hasRole ex:Researcher ;
-    ex:affiliation ex:UniversityX .
+    ex:affiliation ex:UniversityX ;
+    ex:userName "alice" ;
+    ex:password "AlicePassword" .

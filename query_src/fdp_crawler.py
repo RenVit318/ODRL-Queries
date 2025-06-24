@@ -162,9 +162,9 @@ def query_orchestrator(fdp_uris, input_user_graph, input_query_graph, input_grap
 
     # Maybe also put this into one or more objects?
     # Extract all required information for later matching etc. in the right variables
-
+    print("STARTING NEW RUN")
     query_graph, query_sbj, query_action, user_graph, user = prepare_query(input_user_graph, input_query_graph, input_graph_type)
-    data = {}
+    results = []
 
     for fdp_uri in fdp_uris:
         print(f"\nProcessing FDP: {fdp_uri}")
@@ -185,6 +185,12 @@ def query_orchestrator(fdp_uris, input_user_graph, input_query_graph, input_grap
                             print(f"ERROR: URL {endpoint_url} is not supported in the current version.")
                             continue
 
+                        res = {
+                            "fdp": fdp_uri,
+                            "endpoint": endpoint_url,
+                            "allowed": None
+                        }
+
                         #print(f"Checking access for endpoint: {endpoint_url}")
 
                         hierarchy = [
@@ -194,34 +200,50 @@ def query_orchestrator(fdp_uris, input_user_graph, input_query_graph, input_grap
                             ("Distribution", distribution.policies),
                         ]
 
-                        denied = False
-                        allowed = False
-
                         for level_name, policy_refs in hierarchy:
 
                             #print(f"Evaluating prohibitions at level: {level_name}")
                             #print(policy_refs)
                             #if len(policy_refs) > 0:
                             #    print(policy_refs)
-                            if check_policy(policy_refs, query_graph, query_sbj, query_action, user_graph, user, endpoint_url, mode="prohibition"):
+                            match, policy = check_policy(policy_refs, query_graph, query_sbj, query_action, user_graph, user, endpoint_url, mode="prohibition")
+                            if match:
                                 print(f"Access to {endpoint_url} denied due to prohibition in policy. At level {level_name}")
-                                denied = True
+                                
+                                res["allowed"] = False
+                                res["reason"] = "Denied by prohibition"
+                                res["policy"] = policy
+                                results.append(res)
+
                                 break
 
-                        if not denied:
+                        if res["allowed"] is None: 
                             for level_name, policy_refs in hierarchy:
                                 #print(f"Evaluating permissions at level: {level_name}")
                                 #if len(policy_refs) > 0:
                                 #    print(policy_refs)
-                                if check_policy(policy_refs, query_graph, query_sbj, query_action, user_graph, user, endpoint_url, mode="permission"):
+                                match, policy = check_policy(policy_refs, query_graph, query_sbj, query_action, user_graph, user, endpoint_url, mode="permission")
+                                if match:
                                     print(f"Access to {endpoint_url} granted by policy. At level {level_name}")
-                                    allowed = True
+                                    res["allowed"] = True
+                                    res["policy"] = policy
                                     break
 
-                        if not denied and not allowed:
+                        if res["allowed"] is None:
                             print(f"Access to {endpoint_url} denied: No applicable permission found.")  
+                            res["reason"] = "No applicable permission found"
+                            results.append(res)
 
-                        else:
-                            data[endpoint_url] = run_query(query_graph, query_sbj, user_graph, user, endpoint_url)
-        
-    return data
+
+                        elif res["allowed"]:
+                            success, response = run_query(query_graph, query_sbj, user_graph, user, endpoint_url)
+                            if success:
+                                res["data"] = response
+                            else:
+                                res["allowed"] = False
+                                res["reason"] = response
+                                res["policy"] = None # Empty this because this policy allowed access, not relevant anymore.
+                            results.append(res)
+
+
+    return results

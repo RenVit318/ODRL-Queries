@@ -2,5 +2,5 @@
 @prefix odrl: <http://www.w3.org/ns/odrl/2/> .
 
 <http://localhost:8000/distribution2.ttl>
-    dcat:accessURL <http://dbpedia.org/sparql-2> ;
+    dcat:accessURL <https://ag1xtpydmme0ldlr.allegrograph.cloud/repositories/contracts/sparql> ;
     odrl:hasPolicy <http://localhost:8000/policy.ttl#distribution2ProhibitBob> .

@@ -2,5 +2,5 @@
 @prefix odrl: <http://www.w3.org/ns/odrl/2/> .
 
 <http://localhost:8000/distribution4.ttl>
-    dcat:accessURL <http://dbpedia.org/sparql-4> ;
+    dcat:accessURL <https://ag1xtpydmme0ldlr.allegrograph.cloud/repositories/chomsky/sparql> ;
     odrl:hasPolicy <http://localhost:8000/policy.ttl#distribution4Open> .

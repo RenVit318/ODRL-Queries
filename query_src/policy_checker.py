@@ -84,7 +84,7 @@ def check_policy(policy_refs, query_graph, query_sbj, query_action, user_graph, 
     
     policy_graph = load_policy_graph(policy_refs)
 
-    allowed = False
+    match = False
     for ref, _ in policy_refs:
         policy = ref
         if (policy, RDF.type, ODRL.Policy) not in policy_graph:
@@ -106,9 +106,10 @@ def check_policy(policy_refs, query_graph, query_sbj, query_action, user_graph, 
 
             if user_match and action_match and target_match:
                 if matches_constraints(policy_graph, rule, query_graph, query_sbj, user_graph, user):
-                    allowed = True
+                    return True, ref
+                
                 else:
                     print(f"access denied by policy {policy}")
 
-    return allowed
+    return False, None
 

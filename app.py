@@ -40,9 +40,9 @@ query_purpose = st.text_input("Purpose of the query (e.g. 'research', 'analysis'
 # --- User Graph ---
 st.header("3. Upload User Graph")
 user_graph = rdflib.Graph()
-use_default_user = st.checkbox("Use standard user graph (alice.ttl)")
+user_choice = st.radio("Select user:", ["Default: Alice", "Default: Bob", "Upload file"])
 
-if use_default_user:
+if user_choice == "Default: Alice":
     user_graph.parse('users/alice.ttl')
     #try:
     #    url = "https://raw.githubusercontent.com/example/demo-user-graphs/main/alice.ttl"  # Replace with actual URL
@@ -51,6 +51,8 @@ if use_default_user:
     #    st.success(f"Loaded standard user graph with {len(user_graph)} triples.")
     #except Exception as e:
     #    st.error(f"Failed to load default user graph: {e}")
+elif user_choice == "Default: Bob":
+    user_graph.parse('users/bob.ttl')
 else:
     user_graph_file = st.file_uploader("Upload your user RDF graph (.ttl, .rdf, .jsonld)", type=["ttl", "rdf", "jsonld"])
     if user_graph_file is not None:
@@ -93,9 +95,9 @@ if st.button("Evaluate Query"):
                     input_graph_type = 'graph'                         
                 )
 
-                st.write('Finshed the program')
-                st.write(results)
-            
+                #st.write('Finshed the program')
+                #st.write(results)
+                print(len(results))
 
                 if not isinstance(results, list):
                     st.error("❌ Unexpected response format from evaluate_query. Expected a list of results.")
@@ -103,13 +105,25 @@ if st.button("Evaluate Query"):
                     st.warning("No FDPs returned any results or all queries were denied.")
                 else:
                     for res in results:
-                        fdp_label = res.get("fdp", "[Unknown FDP]")
-                        st.subheader(f"FDP: {fdp_label}")
+                        fdp_text = res.get("fdp", "[Unknown FDP]")
+                        #endpoint_text = res.get("endpoint")
+                        st.subheader(f"FDP: {fdp_text}")
+                        st.write(f"Endpoint: {res.get('endpoint')}")
+
                         if res.get("allowed"):
                             st.success("✅ Query Permitted")
-                            st.json(res.get("data", {}))
+                            allowed_by = res.get('policy', 'Unknown policy.')
+                            st.markdown(f"**Allowed by:** {allowed_by}")
+                            if res.get("data") is None:
+                                st.error(f"Failed to get data. {res.get('error', 'Unkown error. Probably occured at the triplestore.')}")
+                            else:
+                                st.json(res.get("data", {}))
                         else:
                             st.error("❌ Query Denied")
                             st.markdown(f"**Reason:** {res.get('reason', 'No reason provided.')}")
+                            denied_by = res.get('policy', False)
+                            if denied_by:
+                                st.markdown(f"**Denied by:** {denied_by}")
+
             except Exception as e:
                 st.exception(e)

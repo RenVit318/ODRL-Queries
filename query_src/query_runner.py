@@ -9,6 +9,7 @@ def run_query(query_graph, query_sbj, user_graph, user, endpoint_url):
         return run_query_agraph(query_graph, query_sbj, user_graph, user, endpoint_url)
     else:
         print(f"Endpoint {endpoint_url} is not in supported endpoint types!")
+        return None
         #raise Warning(f"Endpoint {endpoint_url} is not in supported endpoint types!")
 
 def run_query_agraph(query_graph, query_sbj, user_graph, user, endpoint_url):
@@ -22,17 +23,22 @@ def run_query_agraph(query_graph, query_sbj, user_graph, user, endpoint_url):
         'query': query_graph.value(query_sbj, EX.queryText)
     }
     
-    # Some form of authentication, where do we store this?
-    username = None
-    password = None
+    # Storing credentials in the graph is not the final way to go!
+    # This should end up being e.g. OAuth or OIDC
+    
+    username = user_graph.value(user, EX.userName) 
+    password = user_graph.value(user, EX.password)
+    print("AUTH ",username,password)
     auth = (username, password) if username and password else None
+    print(auth)
 
     response = requests.post(endpoint_url, headers=headers, data=data, auth=auth)
 
     if response.status_code == 200:
-        return response.json()["results"]["bindings"]
+        return True, response.json()["results"]["bindings"]
     else:
-        raise Exception(f"SPARQL query failed: {response.status_code}\n{response.text}")
+        return False, f"SPARQL query failed: {response.status_code}\n{response.text}"
+
 
 def run_query_TODO(query, dataset_uri):
     sparql = SPARQLWrapper(dataset_uri)
