@@ -1,6 +1,5 @@
 pandas
 rdflib
-io
 requests
 urllib
 SPARQLWrapper
